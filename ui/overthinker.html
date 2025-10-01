@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>ASTRA-X · Overthinker v2</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<style>
+  :root{color-scheme:dark;--bg:#0b0f14;--panel:#121821;--border:#1f2933;--accent:#4da3ff;--text:#e7eef7}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+  header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+  .tabs{display:flex;gap:8px}
+  .tab-btn{padding:8px 12px;border-radius:999px;border:1px solid var(--border);background:#151b26;color:var(--text);cursor:pointer;font-size:13px}
+  .tab-btn.active{background:var(--accent);border-color:var(--accent);color:#021326}
+  main{padding:14px;max-width:980px;margin:auto}
+  .panel{display:none;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px}
+  .panel.active{display:block}
+  textarea{width:100%;min-height:120px;background:#0e1520;border:1px solid var(--border);border-radius:10px;color:var(--text);padding:10px;font-family:monospace;font-size:13px}
+  input,select{background:#0e1520;border:1px solid var(--border);border-radius:8px;color:var(--text);padding:6px 8px;font-size:13px}
+  label{font-size:13px;display:block;margin-top:10px;margin-bottom:4px}
+  button{background:var(--accent);border:0;border-radius:8px;padding:8px 12px;color:#021326;font-weight:600;cursor:pointer;font-size:13px}
+  button.secondary{background:#1b2433;color:var(--text);border:1px solid var(--border);font-weight:500}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px}
+  .status{font-size:12px;opacity:.7;margin-top:8px;white-space:pre-wrap}
+</style>
+</head>
+<body>
+<header>
+  <div style="font-weight:600">ASTRA-X Overthinker v2</div>
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="goals">Goals</button>
+    <button class="tab-btn" data-tab="schedule">Schedule & Run</button>
+    <button class="tab-btn" data-tab="model">Model & Prompts</button>
+  </div>
+</header>
+<main>
+  <section id="tab-goals" class="panel active">
+    <h3>Daily / Weekly / Yearly Goals</h3>
+    <label for="scopeSel">Scope</label>
+    <select id="scopeSel">
+      <option value="daily">Daily</option>
+      <option value="weekly">Weekly</option>
+      <option value="yearly">Yearly</option>
+    </select>
+    <label for="goalsTxt">Goals (markdown)</label>
+    <textarea id="goalsTxt"></textarea>
+    <div class="row">
+      <button id="saveGoals">Save goals</button>
+      <button id="reloadGoals" class="secondary">Reload</button>
+    </div>
+    <div class="status" id="goalsStatus"></div>
+  </section>
+
+  <section id="tab-schedule" class="panel">
+    <h3>Schedule & Ad-hoc Run</h3>
+    <div class="row">
+      <label><input type="checkbox" id="autopilotChk"> Autopilot enabled</label>
+      <label>Poll minutes <input type="number" id="pollMin" min="5" style="width:80px"></label>
+      <label>Rate limit/day <input type="number" id="rlDay" min="1" style="width:80px"></label>
+    </div>
+    <label for="quiet">Quiet hours (HH:MM-HH:MM)</label>
+    <input id="quiet" style="width:140px">
+
+    <div class="row" style="margin-top:14px">
+      <button id="saveSchedule">Save schedule</button>
+      <button id="reloadConfig" class="secondary">Reload config</button>
+    </div>
+
+    <hr style="margin:16px 0;border-color:#1f2933">
+
+    <h4>Run now</h4>
+    <div class="row">
+      <select id="runScope">
+        <option value="daily">Daily</option>
+        <option value="weekly">Weekly</option>
+        <option value="yearly" selected>Yearly</option>
+      </select>
+      <button id="runNow">Run one iteration</button>
+      <button id="completeRun" class="secondary">Mark current as done (archive)</button>
+    </div>
+    <label>Current plan (read-only)</label>
+    <textarea id="currentPlan" readonly></textarea>
+    <div class="status" id="runStatus"></div>
+
+    <h4>Feedback for next iterations</h4>
+    <label for="fbScope">Scope</label>
+    <select id="fbScope">
+      <option value="daily">Daily</option>
+      <option value="weekly">Weekly</option>
+      <option value="yearly" selected>Yearly</option>
+    </select>
+    <label for="fbTxt">Feedback</label>
+    <textarea id="fbTxt"></textarea>
+    <div class="row">
+      <button id="saveFeedback">Append feedback</button>
+      <button id="loadFeedback" class="secondary">Load feedback</button>
+    </div>
+    <div class="status" id="fbStatus"></div>
+  </section>
+
+  <section id="tab-model" class="panel">
+    <h3>Model & Prompt Config</h3>
+    <p style="font-size:13px;opacity:.8">
+      Prompts live in <code>prompts/</code> (gitignored).
+    </p>
+    <label>Provider (openai / ollama)</label>
+    <input id="modelProvider" placeholder="openai">
+    <label>Model name</label>
+    <input id="modelName" placeholder="gpt-4.1-mini">
+    <label>API base (optional)</label>
+    <input id="apiBase" placeholder="https://api.openai.com or http://host.docker.internal:11434">
+    <label>API key env var</label>
+    <input id="apiKeyEnv" placeholder="OPENAI_API_KEY">
+    <label>Temperature</label>
+    <input id="temp" type="number" step="0.05" min="0" max="1" style="width:80px">
+    <label>Max tokens</label>
+    <input id="maxTok" type="number" style="width:100px">
+
+    <div class="row" style="margin-top:14px">
+      <button id="saveModel">Save config</button>
+      <button id="reloadConfig2" class="secondary">Reload config</button>
+    </div>
+    <div class="status" id="cfgStatus"></div>
+
+    <p style="font-size:12px;opacity:.7;margin-top:16px">
+      Edit prompts under <code>prompts/</code>:
+      <code>system_planner.txt</code>, <code>system_refiner.txt</code>,
+      <code>system_summarizer.txt</code>, <code>persona_general.txt</code>.
+    </p>
+  </section>
+</main>
+<script>
+  document.querySelectorAll('.tab-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  async function jget(url){
+    const r = await fetch(url,{cache:'no-store'});
+    if(!r.ok) throw new Error(await r.text());
+    return r.json();
+  }
+  async function jpost(url, body){
+    const r = await fetch(url,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+    if(!r.ok) throw new Error(await r.text());
+    return r.json();
+  }
+
+  const scopeSel = document.getElementById('scopeSel');
+  const goalsTxt = document.getElementById('goalsTxt');
+  const goalsStatus = document.getElementById('goalsStatus');
+
+  async function loadGoals(){
+    try{
+      const s = scopeSel.value;
+      const j = await jget('/api/goals/'+s);
+      goalsTxt.value = j.text || '';
+      goalsStatus.textContent = 'Loaded goals for '+s;
+    }catch(e){
+      goalsStatus.textContent = 'Error: '+e;
+    }
+  }
+  document.getElementById('reloadGoals').onclick = loadGoals;
+  document.getElementById('saveGoals').onclick = async ()=>{
+    try{
+      const s = scopeSel.value;
+      await jpost('/api/goals/'+s, {text: goalsTxt.value});
+      goalsStatus.textContent = 'Saved goals for '+s;
+    }catch(e){
+      goalsStatus.textContent = 'Error: '+e;
+    }
+  };
+  scopeSel.onchange = loadGoals;
+  loadGoals();
+
+  const autopilotChk = document.getElementById('autopilotChk');
+  const pollMin = document.getElementById('pollMin');
+  const rlDay = document.getElementById('rlDay');
+  const quiet = document.getElementById('quiet');
+  const runScope = document.getElementById('runScope');
+  const currentPlan = document.getElementById('currentPlan');
+  const runStatus = document.getElementById('runStatus');
+
+  async function loadConfig(){
+    try{
+      const c = await jget('/api/config');
+      autopilotChk.checked = !!c.schedule.autopilot;
+      pollMin.value = c.schedule.poll_minutes;
+      rlDay.value = c.schedule.rate_limit_per_day;
+      quiet.value = c.schedule.quiet_hours;
+      modelProvider.value = c.model.provider;
+      modelName.value = c.model.model_name;
+      apiBase.value = c.model.api_base || '';
+      apiKeyEnv.value = c.model.api_key_env || '';
+      temp.value = c.model.temperature;
+      maxTok.value = c.model.max_tokens;
+      runStatus.textContent = 'Config loaded.';
+      cfgStatus.textContent = 'Config loaded.';
+    }catch(e){
+      runStatus.textContent = 'Error loading config: '+e;
+      cfgStatus.textContent = 'Error loading config: '+e;
+    }
+  }
+
+  async function loadCurrentPlan(){
+    try{
+      const s = runScope.value;
+      const j = await jget('/api/run/status/'+s);
+      currentPlan.value = j.current_markdown || '';
+      runStatus.textContent = 'Loaded current plan for '+s;
+    }catch(e){
+      runStatus.textContent = 'Error: '+e;
+    }
+  }
+
+  document.getElementById('runNow').onclick = async ()=>{
+    try{
+      const s = runScope.value;
+      runStatus.textContent = 'Running '+s+' iteration...';
+      const j = await jpost('/api/run', {scope:s});
+      await loadCurrentPlan();
+      runStatus.textContent = 'Run complete. scope='+j.scope+' run_id='+j.run_id;
+    }catch(e){
+      runStatus.textContent = 'Error: '+e;
+    }
+  };
+  document.getElementById('completeRun').onclick = async ()=>{
+    try{
+      const s = runScope.value;
+      const j = await jpost('/api/run/complete/'+s, {});
+      currentPlan.value = '';
+      runStatus.textContent = 'Archived as '+j.archived_as;
+    }catch(e){
+      runStatus.textContent = 'Error: '+e;
+    }
+  };
+  document.getElementById('saveSchedule').onclick = async ()=>{
+    try{
+      const c = await jget('/api/config');
+      const payload = {
+        model: c.model,
+        schedule: {
+          autopilot: autopilotChk.checked,
+          poll_minutes: Number(pollMin.value||30),
+          rate_limit_per_day: Number(rlDay.value||6),
+          quiet_hours: quiet.value || "02:00-04:00"
+        }
+      };
+      await jpost('/api/config', payload);
+      runStatus.textContent = 'Schedule saved & scheduler reloaded.';
+    }catch(e){
+      runStatus.textContent = 'Error: '+e;
+    }
+  };
+  document.getElementById('reloadConfig').onclick = loadConfig;
+  runScope.onchange = loadCurrentPlan;
+
+  const fbScope = document.getElementById('fbScope');
+  const fbTxt = document.getElementById('fbTxt');
+  const fbStatus = document.getElementById('fbStatus');
+
+  document.getElementById('saveFeedback').onclick = async ()=>{
+    try{
+      await jpost('/api/feedback', {scope: fbScope.value, text: fbTxt.value});
+      fbStatus.textContent = 'Feedback appended.';
+      fbTxt.value = '';
+    }catch(e){
+      fbStatus.textContent = 'Error: '+e;
+    }
+  };
+  document.getElementById('loadFeedback').onclick = async ()=>{
+    try{
+      const j = await jget('/api/feedback/'+fbScope.value);
+      fbTxt.value = j.text || '';
+      fbStatus.textContent = 'Loaded feedback for '+fbScope.value;
+    }catch(e){
+      fbStatus.textContent = 'Error: '+e;
+    }
+  };
+
+  const modelProvider = document.getElementById('modelProvider');
+  const modelName = document.getElementById('modelName');
+  const apiBase = document.getElementById('apiBase');
+  const apiKeyEnv = document.getElementById('apiKeyEnv');
+  const temp = document.getElementById('temp');
+  const maxTok = document.getElementById('maxTok');
+  const cfgStatus = document.getElementById('cfgStatus');
+
+  document.getElementById('saveModel').onclick = async ()=>{
+    try{
+      const c = await jget('/api/config');
+      const payload = {
+        model: {
+          provider: modelProvider.value || 'openai',
+          model_name: modelName.value || 'gpt-4.1-mini',
+          api_base: apiBase.value || null,
+          api_key_env: apiKeyEnv.value || 'OPENAI_API_KEY',
+          temperature: Number(temp.value || 0.4),
+          max_tokens: Number(maxTok.value || 1500),
+        },
+        schedule: c.schedule
+      };
+      await jpost('/api/config', payload);
+      cfgStatus.textContent = 'Model config saved.';
+    }catch(e){
+      cfgStatus.textContent = 'Error: '+e;
+    }
+  };
+  document.getElementById('reloadConfig2').onclick = loadConfig;
+
+  loadConfig();
+  loadCurrentPlan();
+</script>
+</body>
+</html>
