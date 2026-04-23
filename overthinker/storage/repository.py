@@ -12,30 +12,6 @@ from overthinker.core.paths import DATABASE_FILE
 from overthinker.storage.migration import migrate_current_storage
 
 
-BOOTSTRAP_GOALS = {
-    Scope.DAILY: GoalItem(
-        title="Define the most important work to move forward today",
-        details=(
-            "Use this as the daily planning anchor until real project-specific daily goals "
-            "replace it."
-        ),
-        priority=4,
-        active=True,
-        order=0,
-    ),
-    Scope.WEEKLY: GoalItem(
-        title="Convert current priorities into a concrete weekly execution plan",
-        details=(
-            "This bootstrap goal keeps the weekly loop runnable and should be replaced with "
-            "real weekly targets."
-        ),
-        priority=4,
-        active=True,
-        order=0,
-    ),
-}
-
-
 def now_iso() -> str:
     return datetime.now().isoformat(timespec="seconds")
 
@@ -175,7 +151,6 @@ class SQLiteRepository:
             conn.commit()
 
         migrate_current_storage(self)
-        self._ensure_bootstrap_goals()
 
     def _ensure_run_columns(self, conn: sqlite3.Connection) -> None:
         rows = conn.execute("PRAGMA table_info(runs)").fetchall()
@@ -202,20 +177,6 @@ class SQLiteRepository:
                 (scope.value, now_iso()),
             )
             conn.commit()
-
-    def _ensure_bootstrap_goals(self) -> None:
-        for scope, seed_item in BOOTSTRAP_GOALS.items():
-            document = self.get_goal_document(scope)
-            if document.items:
-                continue
-            self.save_goal_document(
-                scope,
-                [seed_item.model_copy(update={"id": GoalItem().id, "order": 0})],
-                (
-                    "Bootstrap goal created automatically so the scope is runnable. "
-                    "Replace this with project-specific goals."
-                ),
-            )
 
     def get_goal_document(self, scope: Scope) -> GoalDocument:
         self._ensure_goal_document(scope)

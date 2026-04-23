@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
 
 from overthinker.app import create_app
-from overthinker.core.models import Scope
+from overthinker.core.models import GoalItem, Scope
 from overthinker.services.llm import LLMCallResult
 from overthinker.services.planner import run_iteration
 from overthinker.storage.repository import SQLiteRepository
@@ -20,7 +20,7 @@ class RepositoryTests(unittest.TestCase):
         root.mkdir(parents=True, exist_ok=True)
         return root / f"{uuid4().hex}.sqlite3"
 
-    def test_initialize_bootstraps_empty_daily_and_weekly_scopes(self) -> None:
+    def test_initialize_keeps_new_scopes_empty(self) -> None:
         db_path = self.make_db_path()
         try:
             repository = SQLiteRepository(db_path)
@@ -29,8 +29,8 @@ class RepositoryTests(unittest.TestCase):
             daily = repository.get_goal_document(Scope.DAILY)
             weekly = repository.get_goal_document(Scope.WEEKLY)
 
-            self.assertGreaterEqual(len(daily.items), 1)
-            self.assertGreaterEqual(len(weekly.items), 1)
+            self.assertEqual(len(daily.items), 0)
+            self.assertEqual(len(weekly.items), 0)
         finally:
             db_path.unlink(missing_ok=True)
 
@@ -39,6 +39,11 @@ class RepositoryTests(unittest.TestCase):
         try:
             repository = SQLiteRepository(db_path)
             repository.initialize()
+            repository.save_goal_document(
+                Scope.DAILY,
+                [GoalItem(title="Test daily goal", order=0)],
+                "",
+            )
 
             record = repository.create_run(
                 Scope.DAILY,
@@ -84,6 +89,11 @@ class PlannerTests(unittest.IsolatedAsyncioTestCase):
         try:
             repository = SQLiteRepository(db_path)
             repository.initialize()
+            repository.save_goal_document(
+                Scope.DAILY,
+                [GoalItem(title="Test daily goal", order=0)],
+                "",
+            )
             with patch(
                 "overthinker.services.planner.call_llm",
                 new=AsyncMock(

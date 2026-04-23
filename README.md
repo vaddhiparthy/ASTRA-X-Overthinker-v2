@@ -96,6 +96,7 @@ The app ships with default prompt files under:
 - `PostgresRepository` is the default production-style backend for this repo.
 - The planner records `provider`, `configured_model`, and `effective_model` on each run.
 - The control panel now exposes storage configuration as first-class settings.
+- New scopes start empty by default. The app does not seed project goals automatically.
 
 ## Testing
 

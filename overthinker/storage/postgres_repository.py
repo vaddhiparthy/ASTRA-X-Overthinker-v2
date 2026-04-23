@@ -10,7 +10,6 @@ from psycopg2.extras import RealDictCursor
 from overthinker.core.config import OverthinkerConfig
 from overthinker.core.models import FeedbackEntry, GoalDocument, GoalItem, RunRecord, Scope
 from overthinker.storage.repository import (
-    BOOTSTRAP_GOALS,
     new_run_id,
     now_iso,
     split_markdown_sections,
@@ -142,7 +141,6 @@ class PostgresRepository:
                     )
                 )
             conn.commit()
-        self._ensure_bootstrap_goals()
 
     def _ensure_goal_document(self, scope: Scope) -> None:
         with self.connection() as conn:
@@ -158,17 +156,6 @@ class PostgresRepository:
                     (scope.value, now_iso()),
                 )
             conn.commit()
-
-    def _ensure_bootstrap_goals(self) -> None:
-        for scope, seed_item in BOOTSTRAP_GOALS.items():
-            document = self.get_goal_document(scope)
-            if document.items:
-                continue
-            self.save_goal_document(
-                scope,
-                [seed_item.model_copy(update={"id": GoalItem().id, "order": 0})],
-                "Bootstrap goal created automatically so the scope is runnable. Replace this with project-specific goals.",
-            )
 
     def get_goal_document(self, scope: Scope) -> GoalDocument:
         self._ensure_goal_document(scope)
