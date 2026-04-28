@@ -4,7 +4,9 @@ from typing import Any
 
 from overthinker.core.config import OverthinkerConfig, load_config
 from overthinker.core.models import Scope
-from overthinker.services.llm import call_llm, load_system_prompts
+from overthinker.services.guardrails import check_input, check_output
+from overthinker.services.llm import call_llm
+from overthinker.services.prompt_registry import render_prompt
 
 
 def _format_goals(document) -> str:
@@ -53,48 +55,37 @@ async def run_iteration(
             f"Rate limit reached for '{scope.value}' ({cfg.schedule.rate_limit_per_day} runs today)."
         )
 
-    prompts = load_system_prompts()
     current = repository.get_current_run(scope)
     feedback = repository.list_feedback(scope, limit=12)
 
-    user_payload = f"""
-[GOAL_SCOPE]
-{scope.value}
+    system_prompt = render_prompt("planner_system")
+    persona_prompt = render_prompt("planner_persona")
+    user_prompt = render_prompt(
+        "planner_user_payload",
+        {
+            "scope": scope.value,
+            "goals": goals_text,
+            "current_plan": current.plan_markdown if current else "(none yet)",
+            "feedback": _format_feedback(feedback),
+        },
+    )
 
-[STRUCTURED_GOALS]
-{goals_text}
-
-[CURRENT_PLAN]
-{current.plan_markdown if current else "(none yet)"}
-
-[FEEDBACK]
-{_format_feedback(feedback)}
-
-[INSTRUCTIONS]
-- Produce a concrete plan that moves the scope forward.
-- Keep sections concise and operational.
-- Output markdown with these sections only:
-  - Path to completion
-  - Steps
-  - Risks
-  - Summary
-"""
+    check_input(user_prompt.content)
 
     messages = [
         {
             "role": "system",
-            "content": prompts["planner"]
-            or "You are an execution planner that turns goals into practical next steps.",
+            "content": system_prompt.content,
         },
         {
             "role": "system",
-            "content": prompts["persona_general"]
-            or "Be direct, organized, and operationally useful.",
+            "content": persona_prompt.content,
         },
-        {"role": "user", "content": user_payload.strip()},
+        {"role": "user", "content": user_prompt.content},
     ]
 
     reply = await call_llm(messages, cfg)
+    check_output(reply.content)
     record = repository.create_run(
         scope,
         reply.content,

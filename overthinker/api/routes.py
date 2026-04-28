@@ -3,14 +3,19 @@ from __future__ import annotations
 import os
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from overthinker.core.config import OverthinkerConfig, load_config, save_config
 from overthinker.core.models import GoalItem, Scope
 from overthinker.core.paths import CONFIG_FILE, DATABASE_FILE, PROMPT_OVERRIDE_DIR, UI_DIR
+from overthinker.demo_content import DEMO_RUNS, render_demo_page
+from overthinker.services.evals import eval_summary, run_static_eval_suite
+from overthinker.services.guardrails import guardrail_summary
 from overthinker.services.llm import choose_preferred_ollama_model, fetch_ollama_models
+from overthinker.services.model_router import router_summary
 from overthinker.services.planner import run_iteration
+from overthinker.services.prompt_registry import prompt_registry_summary
 from overthinker.services.scheduler import OverthinkerScheduler
 from overthinker.storage.factory import create_repository
 
@@ -40,6 +45,10 @@ class ConfigPayload(BaseModel):
     schedule: dict
     runtime: dict
     storage: dict
+
+
+class EvalRunPayload(BaseModel):
+    suite: str = "planning_basic"
 
 
 def repository_from(request: Request):
@@ -143,9 +152,32 @@ async def build_runtime_diagnostics(request: Request) -> dict:
 
 @router.get("/")
 async def root():
-    if UI_DIR.exists():
-        return RedirectResponse(url="/ui/overthinker.html", status_code=307)
-    return {"status": "ok", "service": "astra-x-overthinker-v2"}
+    return HTMLResponse(render_demo_page())
+
+
+@router.get("/demo")
+async def demo():
+    return HTMLResponse(render_demo_page())
+
+
+@router.get("/api/demo/frozen-runs")
+async def frozen_demo_runs():
+    return {"runs": DEMO_RUNS}
+
+
+@router.get("/api/operations/evidence")
+async def operations_evidence():
+    return {
+        "model_router": router_summary(),
+        "prompt_registry": prompt_registry_summary(),
+        "guardrails": guardrail_summary(),
+        "evaluation_harness": eval_summary(),
+    }
+
+
+@router.post("/api/evals/run")
+async def run_eval_suite(payload: EvalRunPayload):
+    return {"ok": True, **run_static_eval_suite(payload.suite)}
 
 
 @router.get("/api/health")

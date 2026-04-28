@@ -63,12 +63,45 @@ class RepositoryTests(unittest.TestCase):
 
 
 class AppTests(unittest.TestCase):
-    def test_root_redirects_to_ui(self) -> None:
+    def test_root_serves_portfolio_demo(self) -> None:
         app = create_app()
         with TestClient(app) as client:
-            response = client.get("/", follow_redirects=False)
-            self.assertEqual(response.status_code, 307)
-            self.assertEqual(response.headers.get("location"), "/ui/overthinker.html")
+            response = client.get("/")
+            self.assertEqual(response.status_code, 200)
+            self.assertIn("ASTRA-X Overthinker", response.text)
+            self.assertIn("Iterative Planning Demo", response.text)
+            self.assertIn("Task", response.text)
+            self.assertIn("feedback", response.text)
+            self.assertIn("/ui/overthinker.html", response.text)
+
+    def test_demo_runs_endpoint(self) -> None:
+        app = create_app()
+        with TestClient(app) as client:
+            response = client.get("/api/demo/frozen-runs")
+            self.assertEqual(response.status_code, 200)
+            payload = response.json()
+            self.assertGreaterEqual(len(payload["runs"]), 2)
+            self.assertEqual(payload["runs"][0]["trigger"], "demo playback")
+
+    def test_operations_evidence_endpoint(self) -> None:
+        app = create_app()
+        with TestClient(app) as client:
+            response = client.get("/api/operations/evidence")
+            self.assertEqual(response.status_code, 200)
+            payload = response.json()
+            self.assertIn("model_router", payload)
+            self.assertIn("prompt_registry", payload)
+            self.assertIn("guardrails", payload)
+            self.assertIn("evaluation_harness", payload)
+
+    def test_static_eval_endpoint(self) -> None:
+        app = create_app()
+        with TestClient(app) as client:
+            response = client.post("/api/evals/run", json={"suite": "planning_basic"})
+            self.assertEqual(response.status_code, 200)
+            payload = response.json()
+            self.assertTrue(payload["ok"])
+            self.assertEqual(payload["failed_count"], 0)
 
     def test_health_exposes_scope_readiness(self) -> None:
         app = create_app()
